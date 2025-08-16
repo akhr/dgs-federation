@@ -1,76 +1,81 @@
 package com.example.listings.datasources;
 
+import com.example.listings.generated.types.Amenity;
 import com.example.listings.generated.types.CreateListingInput;
 import com.example.listings.models.ListingModel;
-import com.fasterxml.jackson.core.type.TypeReference;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.example.listings.generated.types.Amenity;
-import com.example.listings.models.CreateListingModel;
-import org.springframework.http.converter.json.MappingJacksonValue;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.BodyInserter;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 import java.util.List;
 
-
 @Component
 public class ListingService {
-    private static final String LISTING_API_URL = "https://rt-airlock-services-listing.herokuapp.com";
-    private final RestClient client = RestClient.builder().baseUrl(LISTING_API_URL).build();
+	private static final String LISTING_API_URL = "https://rt-airlock-services-listing.herokuapp.com";
+	private static final String LOCAL_HOST_API_URL = "localhost:50000";
 
-    private final ObjectMapper mapper = new ObjectMapper();
+	private final WebClient listingWebClient;
+	private final WebClient localListingWebClient;
 
-    public List<ListingModel> featuredListingsRequest() throws IOException {
-        JsonNode response = client
-                .get()
-                .uri("/featured-listings")
-                .retrieve()
-                .body(JsonNode.class);
+	private final ObjectMapper mapper = new ObjectMapper();
 
-        if (response != null) {
-            return mapper.readValue(response.traverse(), new TypeReference<List<ListingModel>>() {});
-        }
+	public ListingService(@Qualifier("listingWebClient") WebClient listingWebClient,
+	                      @Qualifier("localListingWebClient") WebClient localListingWebClient) {
+		this.listingWebClient = listingWebClient;
+		this.localListingWebClient = localListingWebClient;
+	}
 
-        return null;
-    }
+	public List<ListingModel> getFeaturedListings() throws IOException {
+		return listingWebClient
+				.get()
+				.uri("/featured-listings")
+				.retrieve()
+//				.bodyToMono(JsonNode.class)
+				.bodyToFlux(ListingModel.class)
+				.collectList()
+				.block();
+	}
 
-    public ListingModel listingRequest(String id) {
-        return client
-                .get()
-                .uri("/listings/{listing_id}", id)
-                .retrieve()
-                .body(ListingModel.class);
-    }
+	public ListingModel getListing(String id){
+		return listingWebClient
+				.get()
+				.uri("/listings/{listing_id}", id)
+				.retrieve()
+				.bodyToMono(ListingModel.class)
+				.block();
+	}
 
-    public List<Amenity> amenitiesRequest(String listingId) throws IOException {
-        JsonNode response = client
-                .get()
-                .uri("/listings/{listing_id}/amenities", listingId)
-                .retrieve()
-                .body(JsonNode.class);
+	public List<Amenity> getAmenities(String listingId){
+		return listingWebClient
+				.get()
+				.uri("/listings/{listing_id}/amenities", listingId)
+				.retrieve()
+				.bodyToFlux(Amenity.class)
+				.collectList()
+				.block();
+	}
 
-        if (response != null) {
-            return mapper.readValue(response.traverse(), new TypeReference<List<Amenity>>() {
-            });
-        }
-
-        return null;
-    }
-
-    public ListingModel createListingRequest(CreateListingInput listing) {
-        MappingJacksonValue serializedListing = new MappingJacksonValue(new CreateListingModel(listing));
-        return client
-                .post()
-                .uri("/listings")
-                .body(serializedListing)
-                .retrieve()
-                .body(ListingModel.class);
-    }
-
-
-
-
-
+	public ListingModel createListing(CreateListingInput createListingInput) throws JsonProcessingException {
+		String requestBody = mapper.writeValueAsString(createListingInput);
+		try {
+			return localListingWebClient
+					.post()
+					.uri("/listings")
+					.contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+					.accept(org.springframework.http.MediaType.APPLICATION_JSON)
+					.body(BodyInserters.fromValue(requestBody))
+					.retrieve()
+					.bodyToMono(ListingModel.class)
+					.block();
+		} catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+			System.err.println("Status: " + e.getStatusCode());
+			System.err.println("Body: " + e.getResponseBodyAsString()); // shows JSON from the mappers
+			throw e;
+		}
+	}
 }

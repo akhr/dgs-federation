@@ -1,78 +1,73 @@
 package com.example.listings.datafetchers;
-import com.netflix.graphql.dgs.*;
 
-import com.example.listings.models.ListingModel;
-import java.util.List;
 import com.example.listings.datasources.ListingService;
 import com.example.listings.generated.types.Amenity;
-import graphql.execution.DataFetcherResult;
-import graphql.schema.DataFetcher;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.netflix.graphql.dgs.DgsMutation;
 import com.example.listings.generated.types.CreateListingInput;
 import com.example.listings.generated.types.CreateListingResponse;
+import com.example.listings.models.ListingModel;
+import com.netflix.graphql.dgs.*;
+import graphql.execution.DataFetcherResult;
+import graphql.execution.Execution;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @DgsComponent
 public class ListingDataFetcher {
 
-    private final ListingService listingService;
+	private final ListingService listingService;
 
-    @Autowired
-    public ListingDataFetcher(ListingService listingService) {
-        this.listingService = listingService;
-    }
+	@Autowired
+	public ListingDataFetcher(ListingService listingService) {
+		this.listingService = listingService;
+	}
 
-    @DgsQuery
-    public DataFetcherResult<List<ListingModel>> featuredListings() throws IOException {
-        List<ListingModel> listings = listingService.featuredListingsRequest();
-        return DataFetcherResult.<List<ListingModel>>newResult()
-                .data(listings)
-                .localContext(Map.of("hasAmenityData", false))
-                .build();
-    }
+	@DgsData(parentType = "Query", field = "featuredListings")
+	public DataFetcherResult<List<ListingModel>> featuredListings() throws IOException {
+		List<ListingModel> listings = listingService.getFeaturedListings();
+		return DataFetcherResult.<List<ListingModel>> newResult()
+				.data(listings)
+				.localContext(Map.of("hasAmenityData", false))
+				.build();
+	}
 
-    @DgsQuery
-    public DataFetcherResult<ListingModel> listing(@InputArgument String id) {
-        ListingModel listing = listingService.listingRequest(id);
-        return DataFetcherResult.<ListingModel>newResult()
-                .data(listing)
-                .localContext(Map.of("hasAmenityData", true))
-                .build();
-    }
+	@DgsData(parentType = "Query", field="listing")
+	public DataFetcherResult<ListingModel> listing(@InputArgument String id) throws IOException {
+		ListingModel listing = listingService.getListing(id);
+		return DataFetcherResult.<ListingModel>newResult()
+				.data(listing)
+				.localContext(Map.of("hasAmenityData", true))
+				.build();
+	}
 
-    @DgsData(parentType="Listing")
-    public List<Amenity> amenities(DgsDataFetchingEnvironment dfe) throws IOException {
-        ListingModel listing = dfe.getSource();
-        String id = listing.getId();
-        Map<String, Boolean> localContext = dfe.getLocalContext();
+	@DgsData(parentType = "Listing", field = "amenities")
+	public List<Amenity> amenities(DgsDataFetchingEnvironment dfe) throws IOException {
+		ListingModel listingModel = dfe.getSource();
+		Map<String, Boolean> localContext = dfe.getLocalContext();
+		if(localContext != null && localContext.get("hasAmenityData")) {
+			return listingModel.getAmenities();
+		}
+		String id = listingModel.getId();
+		return listingService.getAmenities(id);
+	}
 
-        if (localContext != null && localContext.get("hasAmenityData")) {
-            return listing.getAmenities();
-        }
-
-        return listingService.amenitiesRequest(id);
-    }
-
-    @DgsMutation
-    public CreateListingResponse createListing(@InputArgument CreateListingInput input) {
-        CreateListingResponse response = new CreateListingResponse();
-        try {
-            ListingModel createdListing = listingService.createListingRequest(input);
-            response.setListing(createdListing);
-            response.setCode(200);
-            response.setMessage("success");
-            response.setSuccess(true);
-        } catch (Exception e) {
-            response.setListing(null);
-            response.setCode(500);
-            response.setMessage(e.getMessage());
-            response.setSuccess(false);
-        }
-
-        return response;
-    }
-
+	@DgsMutation
+	public CreateListingResponse createListing(@InputArgument CreateListingInput input) throws IOException {
+		CreateListingResponse createListingResponse = new CreateListingResponse();
+		try {
+			ListingModel listingModel = listingService.createListing(input);
+			createListingResponse.setCode(200);
+			createListingResponse.setSuccess(true);
+			createListingResponse.setMessage("success");
+			createListingResponse.setListing(listingModel);
+		} catch (Exception e){
+			e.printStackTrace();
+			createListingResponse.setCode(500);
+			createListingResponse.setSuccess(false);
+			createListingResponse.setMessage("failed");
+		}
+		return createListingResponse;
+	}
 }

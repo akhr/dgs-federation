@@ -11,9 +11,10 @@
   listing(id: "random12345") {
     id
     title
-    description
     numOfBeds
     costPerNight
+    closedForBookings
+    description
     amenities
   }
 }

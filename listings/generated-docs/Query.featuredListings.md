@@ -6,9 +6,10 @@
   featuredListings {
     id
     title
-    description
     numOfBeds
     costPerNight
+    closedForBookings
+    description
     amenities
   }
 }
