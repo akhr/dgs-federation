@@ -1,6 +1,6 @@
-package com.example.listings.datafetchers;
+package com.example.listings.dataFetchers;
 
-import com.example.listings.datasources.ListingService;
+import com.example.listings.dataSources.ListingService;
 import com.example.listings.generated.types.Amenity;
 import com.example.listings.generated.types.CreateListingInput;
 import com.example.listings.generated.types.CreateListingResponse;

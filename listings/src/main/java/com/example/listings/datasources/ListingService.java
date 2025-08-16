@@ -1,4 +1,4 @@
-package com.example.listings.datasources;
+package com.example.listings.dataSources;
 
 import com.example.listings.generated.types.Amenity;
 import com.example.listings.generated.types.CreateListingInput;
