@@ -1,0 +1,10 @@
+subgraphs:
+  accounts:
+    routing_url: http://localhost:/graphql
+    schema:
+      file: ./accounts/schema.graphql
+
+  products:
+    routing_url: http://localhost:4002/graphql
+    schema:
+      file: ./products/schema.graphql
